@@ -4,4 +4,5 @@ content.txt
 AGENTS.md
 copilot*.md
 .env
-.env*dist/
+.env*
+dist/
