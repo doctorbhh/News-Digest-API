@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="News Digest — A multi-source news aggregator with AI summarization, article clustering, and sentiment analysis.">
+    <title>News Digest — AI-Powered News Aggregator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700;800&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📰</text></svg>">
+</head>
+<body>
+
+<div id="app">
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h1 class="sidebar-title" id="logo-link">News Intelligence</h1>
+            <span class="sidebar-subtitle">Premium Digest</span>
+        </div>
+
+        <button class="btn-primary sidebar-cta" id="btn-create-digest" style="display:none;">
+            <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">add</span>
+            Create New Digest
+        </button>
+
+        <ul class="sidebar-topics" id="sidebar-nav">
+            <!-- Rendered by app.js -->
+        </ul>
+
+        <div class="sidebar-footer">
+            <a class="sidebar-footer-link" href="#">
+                <span class="material-symbols-outlined">settings</span>
+                Settings
+            </a>
+            <a class="sidebar-footer-link" href="#">
+                <span class="material-symbols-outlined">help</span>
+                Help
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main Content Wrapper -->
+    <div class="content-wrapper">
+        <!-- Top App Bar -->
+        <header class="topbar" id="topbar">
+            <div class="topbar-search">
+                <span class="material-symbols-outlined">search</span>
+                <input type="text" id="search-input" placeholder="Search Intelligence..." />
+            </div>
+            <div class="topbar-actions">
+                <button class="icon-btn" id="theme-toggle" aria-label="Toggle Dark Mode">
+                    <span class="material-symbols-outlined icon-light">light_mode</span>
+                    <span class="material-symbols-outlined icon-dark">dark_mode</span>
+                </button>
+                <button class="icon-btn" id="btn-notifications" aria-label="Notifications">
+                    <span class="material-symbols-outlined">notifications</span>
+                    <span class="notification-dot"></span>
+                </button>
+                <button class="icon-btn" aria-label="Profile">
+                    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">account_circle</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Feed Content -->
+        <main class="main" id="main-content">
+            <!-- Rendered by app.js -->
+        </main>
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

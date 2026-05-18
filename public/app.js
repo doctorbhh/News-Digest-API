@@ -1,0 +1,576 @@
+/**
+ * News Digest — Frontend SPA
+ *
+ * Vanilla JS client that consumes the /api/v1 endpoints.
+ * Uses hash-based routing for navigation:
+ *   #              → Digest home (clusters)
+ *   #topic/:slug   → Topic-filtered clusters
+ *   #cluster/:id   → Cluster detail + related articles
+ *   #article/:id   → Article detail
+ */
+
+(function () {
+    "use strict";
+
+    const API = "/api/v1";
+    const $main = document.getElementById("main-content");
+    const $sidebarNav = document.getElementById("sidebar-nav");
+    const $logoLink = document.getElementById("logo-link");
+
+    // ── Topic Icon Map ────────────────────────────────────
+
+    const topicIcons = {
+        "all":            "newspaper",
+        "ai":             "psychology",
+        "technology":     "biotech",
+        "tech":           "biotech",
+        "sports":         "sports_basketball",
+        "politics":       "gavel",
+        "business":       "trending_up",
+        "entertainment":  "movie",
+        "health":         "health_and_safety",
+        "science":        "science",
+        "world":          "public",
+        "education":      "school",
+        "environment":    "eco",
+        "lifestyle":      "self_improvement",
+        "finance":        "account_balance",
+    };
+
+    function getTopicIcon(slug) {
+        return topicIcons[slug] || "article";
+    }
+
+    // ── Helpers ────────────────────────────────────────────
+
+    async function apiFetch(path) {
+        const res = await fetch(`${API}${path}`);
+        if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+        return res.json();
+    }
+
+    function timeAgo(dateStr) {
+        if (!dateStr) return "";
+        const diff = Date.now() - new Date(dateStr).getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return "Just now";
+        if (mins < 60) return `${mins}m ago`;
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return `${hrs}h ago`;
+        const days = Math.floor(hrs / 24);
+        if (days < 7) return `${days}d ago`;
+        return new Date(dateStr).toLocaleDateString("en-IN", {
+            day: "numeric", month: "short", year: "numeric"
+        });
+    }
+
+    function sentimentIcon(label) {
+        if (label === "positive") return "▲";
+        if (label === "negative") return "▼";
+        return "●";
+    }
+
+    function esc(str) {
+        const d = document.createElement("div");
+        d.textContent = str || "";
+        return d.innerHTML;
+    }
+
+    /** Strip non-article junk lines from scraped content */
+    function cleanArticleContent(raw) {
+        if (!raw) return "";
+        const junkPatterns = [
+            /^you are logged in/i,
+            /^loading\.{0,3}$/i,
+            /don.t have any active subscription/i,
+            /subscribed with another email/i,
+            /your active subscription/i,
+            /account subscription benefits/i,
+            /additional subscription benefits/i,
+            /unlock these with subscription/i,
+            /products you.ve access to/i,
+            /account settings/i,
+            /need help with your subscription/i,
+            /^e-paper$/i,
+            /the view from india/i,
+            /first day first show/i,
+            /today.s cache/i,
+            /science for all/i,
+            /^data point$/i,
+            /^thedge$/i,
+            /^health matters$/i,
+            /^gender agenda$/i,
+            /the hindu on books/i,
+            /your download of the top/i,
+            /the weekly newsletter/i,
+            /ramya kannan writes/i,
+            /stories from beyond the binary/i,
+            /books of the week/i,
+            /news and reviews from the world/i,
+            /looking at world affairs/i,
+            /at the cutting edge of education/i,
+            /decoding the headlines/i,
+            /premium stories, editorials/i,
+            /^logout and login/i,
+            /^back to top$/i,
+            /terms & conditions/i,
+            /^copyright/i,
+            /thg publishing/i,
+            /community guidelines/i,
+            /comments have to be in english/i,
+            /we have migrated to a new commenting/i,
+            /users can access their older comments/i,
+            /^published\s*-\s*\w+\s+\d/i,
+            /^updated\s*-\s*\w+\s+\d/i,
+            /^advertisement$/i,
+            /^promoted$/i,
+            /^also read/i,
+            /^share this$/i,
+            /^featured video of the day/i,
+            /^download app$/i,
+        ];
+
+        const lines = raw.split(/\n+/);
+        const clean = lines.filter(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return false;
+            if (trimmed.length < 3) return false;
+            return !junkPatterns.some(p => p.test(trimmed));
+        });
+
+        let result = clean.join("\n\n");
+        if (result.length > 3000) {
+            result = result.slice(0, 3000).replace(/\s+\S*$/, "") + "…";
+        }
+        return result;
+    }
+
+    function setContent(html) {
+        $main.innerHTML = html;
+    }
+
+    function showLoading(msg) {
+        setContent(`
+            <div class="loading-container">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">${esc(msg || "Loading…")}</div>
+            </div>
+        `);
+    }
+
+    function showError(message) {
+        setContent(`
+            <div class="error-state">
+                <div class="error-icon">⚠️</div>
+                <h3>Something went wrong</h3>
+                <p>${esc(message)}</p>
+                <button onclick="location.reload()">Retry</button>
+            </div>
+        `);
+    }
+
+    function showEmpty(msg) {
+        setContent(`
+            <div class="empty-state">
+                <div class="empty-icon">📭</div>
+                <h3>No stories yet</h3>
+                <p>${esc(msg || "Check back soon — the digest updates every 15 minutes.")}</p>
+            </div>
+        `);
+    }
+
+    // ── Sentiment bar for cluster ──────────────────────────
+
+    function sentimentBarHTML(dist) {
+        if (!dist) return "";
+        const total = (dist.positive || 0) + (dist.neutral || 0) + (dist.negative || 0);
+        if (total === 0) return "";
+        const pct = (v) => ((v / total) * 100).toFixed(1);
+        return `
+            <div class="sentiment-bar">
+                ${dist.positive ? `<div class="seg-positive" style="width:${pct(dist.positive)}%" title="Positive: ${dist.positive}"></div>` : ""}
+                ${dist.neutral  ? `<div class="seg-neutral"  style="width:${pct(dist.neutral)}%"  title="Neutral: ${dist.neutral}"></div>` : ""}
+                ${dist.negative ? `<div class="seg-negative" style="width:${pct(dist.negative)}%" title="Negative: ${dist.negative}"></div>` : ""}
+            </div>
+        `;
+    }
+
+    // ── Dominant sentiment for a cluster ───────────────────
+
+    function dominantSentiment(dist) {
+        if (!dist) return "neutral";
+        const entries = [
+            ["positive", dist.positive || 0],
+            ["neutral", dist.neutral || 0],
+            ["negative", dist.negative || 0]
+        ];
+        entries.sort((a, b) => b[1] - a[1]);
+        return entries[0][0];
+    }
+
+    // ── Sidebar Topic Rendering ───────────────────────────
+
+    function renderSidebarTopics(topics, activeTopic) {
+        if (!topics || topics.length === 0 || !$sidebarNav) return;
+
+        let html = "";
+        html += `<li>
+            <span class="topic-link ${!activeTopic ? "active" : ""}" data-topic="">
+                <span class="material-symbols-outlined">newspaper</span>
+                All News
+            </span>
+        </li>`;
+
+        for (const t of topics) {
+            const slug = t.toLowerCase().replace(/\s+/g, "-");
+            const active = activeTopic === slug ? "active" : "";
+            const icon = getTopicIcon(slug);
+            html += `<li>
+                <span class="topic-link ${active}" data-topic="${esc(slug)}">
+                    <span class="material-symbols-outlined">${icon}</span>
+                    ${esc(t)}
+                </span>
+            </li>`;
+        }
+
+        $sidebarNav.innerHTML = html;
+        bindTopicChips();
+    }
+
+    // ── Cluster Card (Featured AI vs Standard) ────────────
+
+    function clusterCardHTML(cluster, featured) {
+        const sources = (cluster.sources || []).slice(0, 4);
+        const count = cluster.articleCount || 1;
+        const time = timeAgo(cluster.lastArticlePublishedAt);
+
+        if (featured) {
+            return `
+            <article class="card card--ai fade-in" data-cluster-id="${esc(cluster._id)}">
+                <div class="card-ai-label">
+                    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">auto_awesome</span>
+                    <span>AI Executive Summary</span>
+                </div>
+                <h3 class="card-headline">${esc(cluster.headline)}</h3>
+                <p class="card-summary">${esc(cluster.summary)}</p>
+                <div class="card-footer">
+                    <div class="source-list">
+                        ${sources.map(s => `<span class="source-tag">${esc(s)}</span>`).join("")}
+                        <span class="source-tag source-tag--verified">Verified Source</span>
+                    </div>
+                    <div class="card-meta-info">
+                        <span>${count} article${count !== 1 ? "s" : ""}</span>
+                        <span class="dot"></span>
+                        <span>${time}</span>
+                    </div>
+                </div>
+            </article>`;
+        }
+
+        return `
+        <article class="card fade-in" data-cluster-id="${esc(cluster._id)}">
+            <h3 class="card-headline">${esc(cluster.headline)}</h3>
+            <p class="card-summary">${esc(cluster.summary)}</p>
+            <div class="card-footer">
+                <div class="source-list">
+                    ${sources.map(s => `<span class="source-tag">${esc(s)}</span>`).join("")}
+                </div>
+                <div class="card-meta-info">
+                    <span>${count} article${count !== 1 ? "s" : ""}</span>
+                    <span class="dot"></span>
+                    <span>${time}</span>
+                </div>
+            </div>
+            ${sentimentBarHTML(cluster.sentimentDistribution)}
+        </article>`;
+    }
+
+    // ── Pagination ────────────────────────────────────────
+
+    function paginationHTML(page, totalPages, handler) {
+        if (totalPages <= 1) return "";
+        return `
+            <div class="pagination">
+                <button ${page <= 1 ? "disabled" : ""} data-page="${page - 1}" data-handler="${handler}">← Prev</button>
+                <span class="page-info">Page ${page} of ${totalPages}</span>
+                <button ${page >= totalPages ? "disabled" : ""} data-page="${page + 1}" data-handler="${handler}">Next →</button>
+            </div>
+        `;
+    }
+
+    // ── Pages ─────────────────────────────────────────────
+
+    let cachedTopics = null;
+
+    async function loadTopics() {
+        if (cachedTopics) return cachedTopics;
+        try {
+            cachedTopics = await apiFetch("/topics");
+        } catch {
+            cachedTopics = [];
+        }
+        return cachedTopics;
+    }
+
+    /** Digest Home / Topic page */
+    async function renderDigest(topicSlug, page) {
+        page = Math.max(1, parseInt(page) || 1);
+        showLoading("Fetching digest…");
+
+        try {
+            const topics = await loadTopics();
+            let data;
+
+            if (topicSlug) {
+                data = await apiFetch(`/topics/${encodeURIComponent(topicSlug)}/clusters?page=${page}&limit=12`);
+            } else {
+                data = await apiFetch(`/clusters?page=${page}&limit=12`);
+            }
+
+            if (!data.data || data.data.length === 0) {
+                renderSidebarTopics(topics, topicSlug);
+                setContent(`<div class="empty-state">
+                    <div class="empty-icon">📭</div>
+                    <h3>No stories found</h3>
+                    <p>${topicSlug ? "No stories for this topic yet." : "The digest is warming up — check back in a few minutes."}</p>
+                </div>`);
+                return;
+            }
+
+            renderSidebarTopics(topics, topicSlug);
+
+            const titleText = topicSlug ? esc(topicSlug.replace(/-/g, " ")) : "Top Stories";
+            const subtitleText = `Updated ${timeAgo(data.data[0]?.lastArticlePublishedAt) || "recently"}`;
+
+            let html = "";
+            html += `<div class="page-header">
+                <h2 class="page-title">${titleText}</h2>
+                <span class="page-subtitle">${subtitleText}</span>
+            </div>`;
+
+            html += `<div class="card-feed">`;
+            data.data.forEach((cluster, i) => {
+                html += clusterCardHTML(cluster, i === 0 && !topicSlug);
+            });
+            html += `</div>`;
+            html += paginationHTML(data.page, data.totalPages, "digest");
+
+            setContent(html);
+            bindClusterCards();
+            bindPagination(topicSlug);
+
+        } catch (err) {
+            showError(err.message);
+        }
+    }
+
+    /** Cluster detail page */
+    async function renderCluster(clusterId) {
+        showLoading("Loading story…");
+
+        try {
+            const data = await apiFetch(`/clusters/${clusterId}`);
+            const cluster = data.data.cluster;
+            const articles = data.data.articles || [];
+            const dom = dominantSentiment(cluster.sentimentDistribution);
+
+            let html = `<div class="detail-page fade-in">`;
+            html += `<div class="breadcrumb"><a href="#">Digest</a> <span class="sep">›</span> <span>Story</span></div>`;
+            html += `<h1 class="detail-headline">${esc(cluster.headline)}</h1>`;
+            html += `<div class="detail-meta">`;
+            html += `<span class="sentiment-chip ${dom}">${sentimentIcon(dom)} ${dom}</span>`;
+            html += `<span>📰 ${cluster.articleCount || articles.length} article${(cluster.articleCount || articles.length) !== 1 ? "s" : ""}</span>`;
+            if (cluster.sources && cluster.sources.length) {
+                html += `<span>${cluster.sources.join(", ")}</span>`;
+            }
+            html += `<span>🕒 ${timeAgo(cluster.lastArticlePublishedAt)}</span>`;
+            html += `</div>`;
+
+            html += `<div class="detail-summary">${esc(cluster.summary)}</div>`;
+
+            if (cluster.keywords && cluster.keywords.length > 0) {
+                html += `<div class="detail-keywords">`;
+                for (const kw of cluster.keywords.slice(0, 12)) {
+                    html += `<span class="keyword-tag">${esc(kw)}</span>`;
+                }
+                html += `</div>`;
+            }
+
+            html += sentimentBarHTML(cluster.sentimentDistribution);
+
+            if (articles.length > 0) {
+                html += `<div class="related-articles-section"><h3>Coverage from ${cluster.sources ? cluster.sources.length : ""} source${cluster.sources && cluster.sources.length !== 1 ? "s" : ""}</h3>`;
+                for (const art of articles) {
+                    html += `
+                        <div class="related-article-card" data-article-id="${esc(art._id)}">
+                            <div class="related-article-title">${esc(art.title)}</div>
+                            <div class="related-article-meta">
+                                <span>${esc(art.source?.name || "Unknown")}</span>
+                                <span class="sentiment-chip ${art.sentiment || "neutral"}">${sentimentIcon(art.sentiment)} ${art.sentiment || "neutral"}</span>
+                                <span>${timeAgo(art.publishedAt)}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                html += `</div>`;
+            }
+
+            html += `</div>`;
+            setContent(html);
+
+            document.querySelectorAll("[data-article-id]").forEach(el => {
+                el.addEventListener("click", () => {
+                    window.location.hash = `#article/${el.dataset.articleId}`;
+                });
+            });
+
+        } catch (err) {
+            showError(err.message);
+        }
+    }
+
+    /** Article detail page */
+    async function renderArticle(articleId) {
+        showLoading("Loading article…");
+
+        try {
+            const data = await apiFetch(`/articles/${articleId}`);
+            const art = data.data;
+
+            let html = `<div class="detail-page fade-in">`;
+            html += `<div class="breadcrumb"><a href="#">Digest</a>`;
+            if (art.clusterId) {
+                html += ` <span class="sep">›</span> <a href="#cluster/${art.clusterId}">Story</a>`;
+            }
+            html += ` <span class="sep">›</span> <span>Article</span></div>`;
+
+            html += `<h1 class="detail-headline">${esc(art.title)}</h1>`;
+            html += `<div class="detail-meta">`;
+            html += `<span class="sentiment-chip ${art.sentiment || "neutral"}">${sentimentIcon(art.sentiment)} ${art.sentiment || "neutral"}</span>`;
+            html += `<span>📰 ${esc(art.source?.name || "Unknown")}</span>`;
+            html += `<span>🕒 ${timeAgo(art.publishedAt)}</span>`;
+            if (art.url) {
+                html += `<a href="${esc(art.url)}" target="_blank" rel="noopener" class="ext-link">Read original ↗</a>`;
+            }
+            html += `</div>`;
+
+            if (art.summary) {
+                html += `<div class="detail-summary">${esc(art.summary)}</div>`;
+            }
+
+            if (art.keywords && art.keywords.length > 0) {
+                html += `<div class="detail-keywords">`;
+                for (const kw of art.keywords) {
+                    html += `<span class="keyword-tag">${esc(kw)}</span>`;
+                }
+                html += `</div>`;
+            }
+
+            if (art.content) {
+                html += `<div class="detail-content">${esc(cleanArticleContent(art.content))}</div>`;
+            }
+
+            html += `</div>`;
+            setContent(html);
+
+        } catch (err) {
+            showError(err.message);
+        }
+    }
+
+    // ── Event Binding ─────────────────────────────────────
+
+    function bindTopicChips() {
+        document.querySelectorAll(".topic-link").forEach(chip => {
+            chip.addEventListener("click", () => {
+                const topic = chip.dataset.topic;
+                if (topic) {
+                    window.location.hash = `#topic/${topic}`;
+                } else {
+                    window.location.hash = "#";
+                }
+            });
+        });
+    }
+
+    function bindClusterCards() {
+        document.querySelectorAll(".card[data-cluster-id]").forEach(card => {
+            card.addEventListener("click", () => {
+                window.location.hash = `#cluster/${card.dataset.clusterId}`;
+            });
+        });
+    }
+
+    function bindPagination(topicSlug) {
+        document.querySelectorAll(".pagination button").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const page = btn.dataset.page;
+                if (topicSlug) {
+                    window.location.hash = `#topic/${topicSlug}?page=${page}`;
+                } else {
+                    window.location.hash = `#?page=${page}`;
+                }
+            });
+        });
+    }
+
+    // ── Router ────────────────────────────────────────────
+
+    function parseHash() {
+        const raw = window.location.hash.replace(/^#\/?/, "");
+        const [path, qs] = raw.split("?");
+        const params = new URLSearchParams(qs || "");
+        const segments = path.split("/").filter(Boolean);
+        return { segments, params };
+    }
+
+    function route() {
+        const { segments, params } = parseHash();
+        const page = params.get("page") || 1;
+
+        if (segments[0] === "cluster" && segments[1]) {
+            renderCluster(segments[1]);
+        } else if (segments[0] === "article" && segments[1]) {
+            renderArticle(segments[1]);
+        } else if (segments[0] === "topic" && segments[1]) {
+            renderDigest(segments[1], page);
+        } else {
+            renderDigest(null, page);
+        }
+
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    // ── Theme Toggle ──────────────────────────────────────
+
+    const $themeToggle = document.getElementById("theme-toggle");
+    const currentTheme = localStorage.getItem("theme") || "light";
+
+    if (currentTheme === "dark") {
+        document.documentElement.setAttribute("data-theme", "dark");
+    }
+
+    if ($themeToggle) {
+        $themeToggle.addEventListener("click", () => {
+            const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+            if (isDark) {
+                document.documentElement.removeAttribute("data-theme");
+                localStorage.setItem("theme", "light");
+            } else {
+                document.documentElement.setAttribute("data-theme", "dark");
+                localStorage.setItem("theme", "dark");
+            }
+        });
+    }
+
+    // ── Init ──────────────────────────────────────────────
+
+    $logoLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        window.location.hash = "#";
+    });
+
+    window.addEventListener("hashchange", route);
+    route();
+
+})();
