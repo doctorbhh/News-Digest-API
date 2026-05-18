@@ -90,19 +90,7 @@ const clusterSchema = new mongoose.Schema(
 );
 
 clusterSchema.index({
-    topic: 1
-});
-
-clusterSchema.index({
-    normalizedTopic: 1
-});
-
-clusterSchema.index({
     updatedAt: -1
-});
-
-clusterSchema.index({
-    lastArticlePublishedAt: -1
 });
 
 export default mongoose.model(
