@@ -12,8 +12,8 @@
   },
   "name": "newsdigest",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Multi-source news aggregator with LLM summarization, article clustering, sentiment analysis, and a web-based digest frontend",
+  "main": "dist/app.js",
   "scripts": {
     "dev": "node --loader ts-node/esm app.ts",
     "build": "tsc",
@@ -21,7 +21,7 @@
     "test:api": "node --loader ts-node/esm tests/api.endpoints.test.ts"
   },
   "keywords": [],
-  "author": "",
+  "author": "News Digest Team",
   "license": "ISC",
   "type": "module",
   "devDependencies": {

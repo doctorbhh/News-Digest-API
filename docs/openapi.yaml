@@ -1,0 +1,374 @@
+openapi: 3.1.0
+info:
+  title: News Digest API
+  version: 1.0.0
+  description: |
+    OpenAPI specification for the News Digest frontend API.
+    Use clusters as the main digest feed and articles for detail views.
+servers:
+  - url: http://localhost:4000/api/v1
+    description: Local development server
+tags:
+  - name: Articles
+    description: Raw article endpoints
+  - name: Clusters
+    description: Grouped story endpoints
+  - name: Topics
+    description: Topic discovery and topic-based cluster feeds
+paths:
+  /articles:
+    get:
+      tags: [Articles]
+      summary: List articles
+      description: Returns paginated articles with optional filters for topic, source, and sentiment.
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - in: query
+          name: topic
+          schema:
+            type: string
+          example: ai
+        - in: query
+          name: source
+          schema:
+            type: string
+          example: bbc
+        - in: query
+          name: sentiment
+          schema:
+            type: string
+            enum: [positive, neutral, negative]
+          example: positive
+        - in: query
+          name: sort
+          schema:
+            type: string
+          example: -publishedAt
+      responses:
+        '200':
+          description: Paginated article list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedArticlesResponse'
+    
+  /articles/{id}:
+    get:
+      tags: [Articles]
+      summary: Get article by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Article found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleResponse'
+        '400':
+          description: Invalid article id
+        '404':
+          description: Article not found
+
+  /clusters:
+    get:
+      tags: [Clusters]
+      summary: List clustered stories
+      description: Main digest endpoint. Returns grouped stories for the frontend home feed.
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - in: query
+          name: topic
+          schema:
+            type: string
+          example: technology
+        - in: query
+          name: sentiment
+          schema:
+            type: string
+            enum: [positive, neutral, negative]
+          example: negative
+      responses:
+        '200':
+          description: Paginated cluster list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedClustersResponse'
+
+  /clusters/{id}:
+    get:
+      tags: [Clusters]
+      summary: Get cluster by id
+      description: Returns the cluster metadata plus all related articles.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cluster and related articles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterDetailResponse'
+        '400':
+          description: Invalid cluster id
+        '404':
+          description: Cluster not found
+
+  /topics:
+    get:
+      tags: [Topics]
+      summary: List available topics
+      description: Returns the set of topic labels currently available in the cluster collection.
+      responses:
+        '200':
+          description: Array of topic strings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /topics/{topic}/clusters:
+    get:
+      tags: [Topics]
+      summary: List clusters for a topic
+      description: Returns clustered stories for a topic slug such as artificial-intelligence.
+      parameters:
+        - in: path
+          name: topic
+          required: true
+          schema:
+            type: string
+          example: artificial-intelligence
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        '200':
+          description: Paginated cluster list for a topic
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicClustersResponse'
+
+components:
+  schemas:
+    ApiError:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    Article:
+      type: object
+      properties:
+        _id:
+          type: string
+        title:
+          type: string
+        normalizedTitle:
+          type: string
+        content:
+          type: string
+        summary:
+          type: string
+        source:
+          type: object
+          properties:
+            name:
+              type: string
+            type:
+              type: string
+              enum: [rss, api]
+            homepage:
+              type: string
+        url:
+          type: string
+          format: uri
+        topic:
+          type: string
+        normalizedTopic:
+          type: string
+        keywords:
+          type: array
+          items:
+            type: string
+        sentiment:
+          type: string
+          enum: [positive, neutral, negative]
+        clusterId:
+          type: string
+          nullable: true
+        publishedAt:
+          type: string
+          format: date-time
+        fetchedAt:
+          type: string
+          format: date-time
+
+    Cluster:
+      type: object
+      properties:
+        _id:
+          type: string
+        topic:
+          type: string
+        normalizedTopic:
+          type: string
+        headline:
+          type: string
+        normalizedHeadline:
+          type: string
+        summary:
+          type: string
+        keywords:
+          type: array
+          items:
+            type: string
+        articleIds:
+          type: array
+          items:
+            type: string
+        articleCount:
+          type: integer
+        sentimentDistribution:
+          type: object
+          properties:
+            positive:
+              type: integer
+            neutral:
+              type: integer
+            negative:
+              type: integer
+        sources:
+          type: array
+          items:
+            type: string
+        lastArticlePublishedAt:
+          type: string
+          format: date-time
+
+    PaginatedArticlesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Article'
+
+    PaginatedClustersResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cluster'
+
+    TopicClustersResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        topic:
+          type: string
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cluster'
+
+    ArticleResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/Article'
+
+    ClusterDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            cluster:
+              $ref: '#/components/schemas/Cluster'
+            articles:
+              type: array
+              items:
+                $ref: '#/components/schemas/Article'

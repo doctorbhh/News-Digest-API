@@ -1,0 +1,129 @@
+{
+    "info": {
+        "name": "News Digest API",
+        "description": "Complete API collection for the News Digest multi-source news aggregator.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:3000/api/v1"
+        }
+    ],
+    "item": [
+        {
+            "name": "Articles",
+            "item": [
+                {
+                    "name": "List Articles",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{baseUrl}}/articles?page=1&limit=10",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["articles"],
+                            "query": [
+                                { "key": "page", "value": "1" },
+                                { "key": "limit", "value": "10" },
+                                { "key": "topic", "value": "general", "disabled": true },
+                                { "key": "source", "value": "India Today", "disabled": true },
+                                { "key": "sentiment", "value": "positive", "disabled": true },
+                                { "key": "sort", "value": "-publishedAt", "disabled": true }
+                            ]
+                        },
+                        "description": "Returns paginated articles with optional filters for topic, source, sentiment, and sort order."
+                    }
+                },
+                {
+                    "name": "Get Article by ID",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{baseUrl}}/articles/:id",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["articles", ":id"],
+                            "variable": [
+                                { "key": "id", "value": "REPLACE_WITH_ARTICLE_ID" }
+                            ]
+                        },
+                        "description": "Returns a single article by its MongoDB ObjectId."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Clusters",
+            "item": [
+                {
+                    "name": "List Clusters (Digest Feed)",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{baseUrl}}/clusters?page=1&limit=10",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["clusters"],
+                            "query": [
+                                { "key": "page", "value": "1" },
+                                { "key": "limit", "value": "10" },
+                                { "key": "topic", "value": "general", "disabled": true },
+                                { "key": "sentiment", "value": "positive", "disabled": true }
+                            ]
+                        },
+                        "description": "Main digest endpoint. Returns grouped stories for the frontend home feed."
+                    }
+                },
+                {
+                    "name": "Get Cluster by ID",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{baseUrl}}/clusters/:id",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["clusters", ":id"],
+                            "variable": [
+                                { "key": "id", "value": "REPLACE_WITH_CLUSTER_ID" }
+                            ]
+                        },
+                        "description": "Returns cluster metadata plus all related articles."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Topics",
+            "item": [
+                {
+                    "name": "List Topics",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{baseUrl}}/topics",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["topics"]
+                        },
+                        "description": "Returns an array of available topic strings."
+                    }
+                },
+                {
+                    "name": "Get Clusters by Topic",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{baseUrl}}/topics/:topic/clusters?page=1&limit=10",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["topics", ":topic", "clusters"],
+                            "variable": [
+                                { "key": "topic", "value": "general" }
+                            ],
+                            "query": [
+                                { "key": "page", "value": "1" },
+                                { "key": "limit", "value": "10" }
+                            ]
+                        },
+                        "description": "Returns clusters for a specific topic slug."
+                    }
+                }
+            ]
+        }
+    ]
+}
