@@ -23,6 +23,13 @@ export async function getClusters(req: Request, res: Response) {
             query[`sentimentDistribution.${String(req.query.sentiment)}`] = { $gt: 0 };
         }
 
+        // Personalized digest: if authenticated user has subscriptions,
+        // filter to only their subscribed topics (unless ?topic= is explicit)
+        const user = (req as any).user;
+        if (user?.subscribedTopics?.length && !req.query.topic) {
+            query.normalizedTopic = { $in: user.subscribedTopics };
+        }
+
         const [items, total] = await Promise.all([
             Cluster.find(query).sort({ lastArticlePublishedAt: -1, updatedAt: -1 }).skip(skip).limit(limit).lean(),
             Cluster.countDocuments(query)

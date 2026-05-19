@@ -1,10 +1,12 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import { fetchNews } from "./services/fetchNews.service.js";
 import cron from "node-cron";
 import { connectDB } from "./config/database.js";
 import apiV1Router from "./routes/v1/index.js";
+import { optionalAuth } from "./middlewares/auth.middleware.js";
 import { fileURLToPath } from "url";
 import { resolve, dirname, join } from "path";
 
@@ -25,7 +27,19 @@ export function createApp() {
         res.sendFile(join(__dirname, "public", "index.html"));
     });
 
-    app.use("/api/v1", apiV1Router);
+    // ── Rate limiting: 100 requests per 15 minutes per IP ──
+    const apiLimiter = rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 100,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: {
+            success: false,
+            message: "Too many requests, please try again later.",
+        },
+    });
+
+    app.use("/api/v1", apiLimiter, optionalAuth, apiV1Router);
 
     return app;
 }
