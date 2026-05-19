@@ -52,16 +52,16 @@
             ]
         },
         {
-            "name": "Clusters",
+            "name": "Digest",
             "item": [
                 {
-                    "name": "List Clusters (Digest Feed)",
+                    "name": "GET /digest — All Clustered News",
                     "request": {
                         "method": "GET",
                         "url": {
-                            "raw": "{{baseUrl}}/clusters?page=1&limit=10",
+                            "raw": "{{baseUrl}}/digest?page=1&limit=10",
                             "host": ["{{baseUrl}}"],
-                            "path": ["clusters"],
+                            "path": ["digest"],
                             "query": [
                                 { "key": "page", "value": "1" },
                                 { "key": "limit", "value": "10" },
@@ -69,22 +69,22 @@
                                 { "key": "sentiment", "value": "positive", "disabled": true }
                             ]
                         },
-                        "description": "Main digest endpoint. Returns grouped stories for the frontend home feed."
+                        "description": "Main digest endpoint. Returns all grouped stories for the frontend home feed. Alias: /clusters also works."
                     }
                 },
                 {
-                    "name": "Get Cluster by ID",
+                    "name": "GET /digest/:id — Cluster Detail",
                     "request": {
                         "method": "GET",
                         "url": {
-                            "raw": "{{baseUrl}}/clusters/:id",
+                            "raw": "{{baseUrl}}/digest/:id",
                             "host": ["{{baseUrl}}"],
-                            "path": ["clusters", ":id"],
+                            "path": ["digest", ":id"],
                             "variable": [
                                 { "key": "id", "value": "REPLACE_WITH_CLUSTER_ID" }
                             ]
                         },
-                        "description": "Returns cluster metadata plus all related articles."
+                        "description": "Returns cluster metadata plus all related articles. Alias: /clusters/:id also works."
                     }
                 }
             ]
@@ -105,22 +105,22 @@
                     }
                 },
                 {
-                    "name": "Get Clusters by Topic",
+                    "name": "GET /topic/:name — Clusters by Topic",
                     "request": {
                         "method": "GET",
                         "url": {
-                            "raw": "{{baseUrl}}/topics/:topic/clusters?page=1&limit=10",
+                            "raw": "{{baseUrl}}/topic/:name?page=1&limit=10",
                             "host": ["{{baseUrl}}"],
-                            "path": ["topics", ":topic", "clusters"],
+                            "path": ["topic", ":name"],
                             "variable": [
-                                { "key": "topic", "value": "general" }
+                                { "key": "name", "value": "general" }
                             ],
                             "query": [
                                 { "key": "page", "value": "1" },
                                 { "key": "limit", "value": "10" }
                             ]
                         },
-                        "description": "Returns clusters for a specific topic slug."
+                        "description": "Returns clusters for a specific topic. Alias: /topics/:topic/clusters also works."
                     }
                 }
             ]

@@ -19,14 +19,14 @@ A multi-source news aggregator that fetches articles from RSS feeds, scrapes ful
 ## 🏗️ Architecture
 
 ```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│  RSS Feeds   │────▶│  Fetch +     │────▶│   MongoDB    │
-│  (4 sources) │     │  Scrape +    │     │  (articles,  │
-└──────────────┘     │  Summarize + │     │   clusters)  │
-                     │  Sentiment + │     └──────┬───────┘
-                     │  Keywords +  │            │
-                     │  Cluster     │            ▼
-                     └──────────────┘     ┌──────────────┐
+┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+│  RSS Feeds   │────▶ │  Fetch +     │────▶│   MongoDB    │
+│  (4 sources) │      │  Scrape +    │      │  (articles,  │
+└──────────────┘      │  Summarize + │      │   clusters)  │
+                      │  Sentiment + │      └──────┬───────┘
+                      │  Keywords +  │             │
+                      │  Cluster     │             ▼
+                      └──────────────┘    ┌──────────────┐
                                           │  Express API │
                                           │  /api/v1/*   │
                                           └──────┬───────┘
@@ -119,14 +119,16 @@ Base URL: `http://localhost:3000/api/v1`
 - `sentiment` — filter by `positive`, `neutral`, or `negative`
 - `sort` — sort field (default: `-publishedAt`)
 
-### Clusters (Digest)
+### Digest
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/clusters` | List clustered stories (main digest) |
-| `GET` | `/clusters/:id` | Get cluster + related articles |
+| `GET` | `/digest` | List all clustered stories (main digest feed) |
+| `GET` | `/digest/:id` | Get cluster detail + related articles |
 
-**Query parameters** for `GET /clusters`:
+> Aliases: `/clusters` and `/clusters/:id` also work.
+
+**Query parameters** for `GET /digest`:
 
 - `page`, `limit` — pagination
 - `topic` — filter by topic
@@ -137,7 +139,9 @@ Base URL: `http://localhost:3000/api/v1`
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/topics` | List available topics |
-| `GET` | `/topics/:topic/clusters` | Get clusters for a topic |
+| `GET` | `/topic/:name` | Get clusters for a topic |
+
+> Alias: `/topics/:topic/clusters` also works.
 
 ### Response Format
 

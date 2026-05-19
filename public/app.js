@@ -466,9 +466,8 @@
                 html += `</div>`;
             }
 
-            if (art.content) {
-                html += `<div class="detail-content">${esc(cleanArticleContent(art.content))}</div>`;
-            }
+
+
 
             html += `</div>`;
             setContent(html);

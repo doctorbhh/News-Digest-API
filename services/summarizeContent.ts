@@ -17,11 +17,11 @@ type GeminiGenerateContentResponse = {
 function cleanSummary(text: string): string {
     const compact = text.replace(/\s+/g, " ").trim();
 
-    if (compact.length <= 1000) {
+    if (compact.length <= 500) {
         return compact;
     }
 
-    const truncated = compact.slice(0, 1000);
+    const truncated = compact.slice(0, 500);
     const lastFullStop = truncated.lastIndexOf(".");
 
     if (lastFullStop > 0) {
@@ -36,11 +36,11 @@ function buildSummaryPrompt(title: string, content: string): string {
         "You are summarizing a news article for a digest feed.",
         "Return only the summary text. No headings, no bullet points, no markdown, no quotes.",
         "Summary requirements:",
-        "1) 10 to 20 sentences.",
+        "1) Write a concise 2-3 sentence summary.",
         "2) Mention the central event, key actors, and the most important outcome or implication.",
         "3) Keep a neutral journalistic tone.",
         "4) Avoid speculation and avoid adding facts not present in the article.",
-        "5) Maximum 500 characters.",
+        "5) Maximum 500 characters total.",
         "",
         "Article title:",
         title,
@@ -73,7 +73,7 @@ export async function generateSummary(
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!baseUrl || !apiKey || !content.trim()) {
-        return cleanSummary(fallbackSummary);
+        return cleanSummary(fallbackSummary) || fallbackSummary || "No summary available.";
     }
 
     const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
@@ -103,7 +103,7 @@ export async function generateSummary(
                 generationConfig: {
                     temperature: 0.2,
                     topP: 0.9,
-                    maxOutputTokens: 500,
+                    maxOutputTokens: 150,
                 },
             },
             {
@@ -127,7 +127,7 @@ export async function generateSummary(
                 blockReasonMessage: response.data.promptFeedback?.blockReasonMessage,
             });
 
-            return cleanSummary(fallbackSummary);
+            return cleanSummary(fallbackSummary) || fallbackSummary || "No summary available.";
         }
 
         return cleanSummary(aiText);
@@ -148,6 +148,7 @@ export async function generateSummary(
             data: responseError.response?.data,
         });
 
-        return cleanSummary(fallbackSummary);
+        const cleaned = cleanSummary(fallbackSummary);
+        return cleaned || fallbackSummary || "No summary available.";
     }
 }

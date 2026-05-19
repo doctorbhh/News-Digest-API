@@ -9,4 +9,8 @@ router.use("/articles", articlesRouter);
 router.use("/clusters", clustersRouter);
 router.use("/topics", topicsRouter);
 
+// ── Assignment-spec aliases ───────────────────────────────
+router.use("/digest", clustersRouter);
+router.use("/topic", topicsRouter);
+
 export default router;

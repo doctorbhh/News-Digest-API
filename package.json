@@ -16,7 +16,7 @@
   "main": "dist/app.js",
   "scripts": {
     "dev": "node --loader ts-node/esm app.ts",
-    "build": "tsc",
+    "build": "tsc && xcopy /E /I /Y public dist\\public",
     "start": "node dist/app.js",
     "test:api": "node --loader ts-node/esm tests/api.endpoints.test.ts"
   },

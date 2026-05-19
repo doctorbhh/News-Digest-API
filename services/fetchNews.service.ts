@@ -35,6 +35,22 @@ export type NormalizedArticle = {
 
 const parser = new  Parser();
 
+const TOPIC_MAP: Record<string, string[]> = {
+  "politics":  ["election","parliament","bjp","congress","minister","vote","party","cm","mp","mla"],
+  "crime":     ["pocso","arrest","accused","murder","robbery","fraud","court","bail","fir"],
+  "sports":    ["cricket","ipl","match","tournament","wicket","goal","player","team"],
+  "business":  ["market","stocks","economy","gdp","startup","company","revenue","profit"],
+  "technology":["ai","tech","software","app","cyber","digital","internet","data"],
+};
+
+function deriveTopicFromKeywords(keywords: string[]): string {
+  const kSet = new Set(keywords.map(k => k.toLowerCase()));
+  for (const [topic, terms] of Object.entries(TOPIC_MAP)) {
+    if (terms.some(t => kSet.has(t))) return topic;
+  }
+  return "general";
+}
+
 async function fetchRSSFeed(
     source: typeof RSS_SOURCES[number]
 ): Promise<NormalizedArticle[]> {
@@ -62,10 +78,10 @@ async function fetchRSSFeed(
 
             url: item.link || "",
 
-            topic: "general",
+            topic: "general", // will be updated later
 
             normalizedTopic:
-                "general",
+                "general", // will be updated later
 
             keywords: [],
 
@@ -128,30 +144,57 @@ async function filterExistingArticles(
     return articles.filter((article) => !existingUrls.has(article.url));
 }
 
-async function updateContentSummary(rssFeed: NormalizedArticle[]) {
-    for (const article of rssFeed) {
+async function processOne(article: NormalizedArticle) {
+    try {
         const scrapedArticle = await scrapeContent(article);
         article.content = scrapedArticle.content || article.content;
+
+        // Build a proper extractive fallback from the first 2 sentences
+        // of the scraped content, not the raw RSS <description> snippet
+        const fallbackSummary = article.content
+            .split(/(?<=[.!?])\s+/)
+            .slice(0, 2)
+            .join(" ")
+            .trim() || article.summary || article.title || "No summary available.";
+
         article.summary = await generateSummary(
             article.title,
             article.content,
-            article.summary
+            fallbackSummary
         );
 
         const sentiment = analyzeSentiment(article.title, article.content);
         article.sentiment = sentiment.label;
 
         article.keywords = extractKeywords(article.title, article.content);
+        article.topic = deriveTopicFromKeywords(article.keywords);
+        article.normalizedTopic = normalizeText(article.topic);
+    } catch (err) {
+        console.warn(`processOne failed for "${article.title}":`, (err as Error).message);
+    }
+
+    // Absolute safety net: summary must never be empty
+    if (!article.summary || !article.summary.trim()) {
+        article.summary = article.title || "No summary available.";
+    }
+}
+
+async function updateContentSummary(rssFeed: NormalizedArticle[]) {
+    const BATCH = 5;
+    for (let i = 0; i < rssFeed.length; i += BATCH) {
+        await Promise.all(rssFeed.slice(i, i + BATCH).map(processOne));
     }
     return rssFeed;
 }
 
 async function saveArticles(articles: NormalizedArticle[]) {
-    const created: any[] = [];
-    for (const article of articles) {
-        const doc = await Article.create(article);
-        created.push(doc);
+    // Filter out articles that still have empty required fields
+    const valid = articles.filter(a => a.summary && a.summary.trim() && a.title && a.title.trim());
+    if (valid.length === 0) return [];
+    if (valid.length < articles.length) {
+        console.warn(`Skipped ${articles.length - valid.length} articles with missing required fields`);
     }
+    const created = await Article.insertMany(valid);
     return created;
 }
 
@@ -174,14 +217,6 @@ export async function fetchNews() {
         );
 
         const processedArticles = await updateContentSummary(newArticles);
-
-        console.log(
-            JSON.stringify(
-                processedArticles,
-                null,
-                2
-            )
-        );
 
         const createdArticles = await saveArticles(processedArticles);
 
