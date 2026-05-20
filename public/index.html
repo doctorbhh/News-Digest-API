@@ -59,7 +59,7 @@
                     <span class="material-symbols-outlined">notifications</span>
                     <span class="notification-dot"></span>
                 </button>
-                <button class="icon-btn" aria-label="Profile">
+                <button class="icon-btn" id="btn-profile" aria-label="Profile">
                     <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">account_circle</span>
                 </button>
             </div>
@@ -70,6 +70,20 @@
             <!-- Rendered by app.js -->
         </main>
     </div>
+
+    <!-- Account / Subscription Panel -->
+    <div class="account-overlay" id="account-overlay"></div>
+    <aside class="account-panel" id="account-panel">
+        <div class="account-panel-header">
+            <h3>Account</h3>
+            <button class="icon-btn" id="btn-close-panel" aria-label="Close">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <div id="account-panel-body">
+            <!-- Rendered by app.js -->
+        </div>
+    </aside>
 </div>
 
 <script src="app.js"></script>

@@ -63,7 +63,7 @@ export async function updateSubscriptions(req: Request, res: Response) {
         const user = await User.findByIdAndUpdate(
             (req as any).user._id,
             { subscribedTopics: normalized },
-            { new: true }
+            { returnDocument: "after" }
         ).lean();
 
         return res.status(200).json({

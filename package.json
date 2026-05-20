@@ -3,7 +3,7 @@
     "axios": "^1.16.1",
     "cheerio": "^1.2.0",
     "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
+    "dotenv": "^16.4.7",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "mongodb": "^7.2.0",
@@ -16,10 +16,10 @@
   "description": "Multi-source news aggregator with LLM summarization, article clustering, sentiment analysis, and a web-based digest frontend",
   "main": "dist/app.js",
   "scripts": {
-    "dev": "node --loader ts-node/esm app.ts",
+    "dev": "tsx app.ts",
     "build": "tsc && xcopy /E /I /Y public dist\\public",
     "start": "node dist/app.js",
-    "test:api": "node --loader ts-node/esm tests/api.endpoints.test.ts"
+    "test:api": "tsx tests/api.endpoints.test.ts"
   },
   "keywords": [],
   "author": "News Digest Team",
@@ -33,6 +33,7 @@
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.22.3",
     "typescript": "^6.0.3"
   }
 }

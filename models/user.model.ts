@@ -20,6 +20,4 @@ const userSchema = new mongoose.Schema(
     }
 );
 
-userSchema.index({ apiKey: 1 });
-
 export default mongoose.model("User", userSchema);

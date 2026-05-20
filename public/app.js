@@ -41,10 +41,19 @@
         return topicIcons[slug] || "article";
     }
 
+    // ── Auth state (localStorage) ──────────────────────────
+
+    function getApiKey() { return localStorage.getItem("nd_api_key") || ""; }
+    function setApiKey(k) { localStorage.setItem("nd_api_key", k); }
+    function clearApiKey() { localStorage.removeItem("nd_api_key"); }
+
     // ── Helpers ────────────────────────────────────────────
 
     async function apiFetch(path) {
-        const res = await fetch(`${API}${path}`);
+        const headers = {};
+        const key = getApiKey();
+        if (key) headers["x-api-key"] = key;
+        const res = await fetch(`${API}${path}`, { headers });
         if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
         return res.json();
     }
@@ -559,6 +568,235 @@
                 document.documentElement.setAttribute("data-theme", "dark");
                 localStorage.setItem("theme", "dark");
             }
+        });
+    }
+
+    // ── Account Panel ─────────────────────────────────────
+
+    const $panel = document.getElementById("account-panel");
+    const $overlay = document.getElementById("account-overlay");
+    const $panelBody = document.getElementById("account-panel-body");
+    const $btnProfile = document.getElementById("btn-profile");
+    const $btnClose = document.getElementById("btn-close-panel");
+
+    function openPanel() {
+        $panel.classList.add("open");
+        $overlay.classList.add("open");
+        renderAccountPanel();
+    }
+    function closePanel() {
+        $panel.classList.remove("open");
+        $overlay.classList.remove("open");
+    }
+
+    $btnProfile.addEventListener("click", openPanel);
+    $btnClose.addEventListener("click", closePanel);
+    $overlay.addEventListener("click", closePanel);
+
+    // Hook up Settings link too
+    document.querySelectorAll(".sidebar-footer-link").forEach(link => {
+        if (link.textContent.trim().includes("Settings")) {
+            link.addEventListener("click", (e) => { e.preventDefault(); openPanel(); });
+        }
+    });
+
+    async function renderAccountPanel() {
+        const key = getApiKey();
+        if (!key) {
+            renderGuestPanel();
+        } else {
+            await renderUserPanel(key);
+        }
+    }
+
+    function renderGuestPanel() {
+        $panelBody.innerHTML = `
+            <div class="acct-section">
+                <div class="acct-section-title">Login with API Key</div>
+                <p class="acct-info">Already have an API key? Paste it below to log in.</p>
+                <div class="acct-key-display" style="margin-bottom:8px;">
+                    <input type="text" id="login-key-input" placeholder="Paste your API key…"
+                        style="flex:1;background:transparent;border:none;outline:none;font-family:monospace;font-size:13px;color:var(--text-primary);" />
+                </div>
+                <button class="acct-btn" id="btn-login">
+                    <span class="material-symbols-outlined">login</span>
+                    Login
+                </button>
+                <div id="login-status"></div>
+            </div>
+            <div class="acct-divider"></div>
+            <div class="acct-section">
+                <div class="acct-section-title">New User</div>
+                <p class="acct-info">Don't have an account? Register to get a personal API key.</p>
+                <button class="acct-btn acct-btn--outline" id="btn-register">
+                    <span class="material-symbols-outlined">person_add</span>
+                    Get My API Key
+                </button>
+                <div id="register-status"></div>
+            </div>
+        `;
+        document.getElementById("btn-login").addEventListener("click", handleLogin);
+        document.getElementById("btn-register").addEventListener("click", handleRegister);
+        document.getElementById("login-key-input").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") handleLogin();
+        });
+    }
+
+    async function handleLogin() {
+        const input = document.getElementById("login-key-input");
+        const status = document.getElementById("login-status");
+        const key = input.value.trim();
+        if (!key) {
+            status.className = "acct-status error";
+            status.textContent = "Please enter your API key";
+            return;
+        }
+        try {
+            const res = await fetch(`${API}/users/me`, { headers: { "x-api-key": key } });
+            const data = await res.json();
+            if (data.success) {
+                setApiKey(key);
+                status.className = "acct-status success";
+                status.textContent = "Welcome back!";
+                setTimeout(() => renderAccountPanel(), 600);
+            } else {
+                status.className = "acct-status error";
+                status.textContent = data.message || "Invalid API key";
+            }
+        } catch (e) {
+            status.className = "acct-status error";
+            status.textContent = e.message;
+        }
+    }
+
+    async function handleRegister() {
+        const btn = document.getElementById("btn-register");
+        const status = document.getElementById("register-status");
+        btn.disabled = true;
+        btn.textContent = "Registering…";
+        try {
+            const res = await fetch(`${API}/users/register`, { method: "POST" });
+            const data = await res.json();
+            if (data.success && data.apiKey) {
+                setApiKey(data.apiKey);
+                status.className = "acct-status success";
+                status.textContent = "Registered! Your key is saved.";
+                setTimeout(() => renderAccountPanel(), 800);
+            } else {
+                status.className = "acct-status error";
+                status.textContent = data.message || "Registration failed";
+                btn.disabled = false;
+                btn.textContent = "Get My API Key";
+            }
+        } catch (e) {
+            status.className = "acct-status error";
+            status.textContent = e.message;
+            btn.disabled = false;
+            btn.textContent = "Get My API Key";
+        }
+    }
+
+    async function renderUserPanel(key) {
+        let userData = { subscribedTopics: [] };
+        try {
+            const me = await fetch(`${API}/users/me`, { headers: { "x-api-key": key } });
+            const j = await me.json();
+            if (!j.success) { clearApiKey(); renderGuestPanel(); return; }
+            userData = j.data;
+        } catch { clearApiKey(); renderGuestPanel(); return; }
+
+        let allTopics = [];
+        try { allTopics = await apiFetch("/topics"); } catch {}
+
+        const subscribed = new Set((userData.subscribedTopics || []).map(t => t.toLowerCase()));
+        const shortKey = key.slice(0, 8) + "…" + key.slice(-4);
+
+        let html = `
+            <div class="acct-section">
+                <div class="acct-section-title">API Key</div>
+                <div class="acct-key-display">
+                    <span id="key-text">${esc(shortKey)}</span>
+                    <button id="btn-copy-key" title="Copy full key">
+                        <span class="material-symbols-outlined">content_copy</span>
+                    </button>
+                </div>
+            </div>
+            <div class="acct-divider"></div>
+            <div class="acct-section">
+                <div class="acct-section-title">Subscribed Topics</div>
+                <p class="acct-info">Toggle topics to personalize your digest. When subscribed, the home feed shows only your chosen topics.</p>
+                <div class="acct-topic-grid" id="topic-toggles">`;
+
+        for (const t of allTopics) {
+            const slug = t.toLowerCase();
+            const sel = subscribed.has(slug) ? "selected" : "";
+            const icon = getTopicIcon(slug);
+            html += `<span class="acct-topic-chip ${sel}" data-topic="${esc(slug)}">
+                <span class="material-symbols-outlined">${icon}</span>${esc(t)}</span>`;
+        }
+
+        html += `</div>
+                <button class="acct-btn" id="btn-save-subs">
+                    <span class="material-symbols-outlined">save</span>
+                    Save Subscriptions
+                </button>
+                <div id="subs-status"></div>
+            </div>
+            <div class="acct-divider"></div>
+            <div class="acct-section">
+                <button class="acct-btn acct-btn--danger" id="btn-logout">
+                    <span class="material-symbols-outlined">logout</span>
+                    Logout
+                </button>
+            </div>`;
+
+        $panelBody.innerHTML = html;
+
+        // Copy key
+        document.getElementById("btn-copy-key").addEventListener("click", () => {
+            navigator.clipboard.writeText(key);
+            document.getElementById("key-text").textContent = "Copied!";
+            setTimeout(() => { document.getElementById("key-text").textContent = shortKey; }, 1500);
+        });
+
+        // Toggle chips
+        document.querySelectorAll("#topic-toggles .acct-topic-chip").forEach(chip => {
+            chip.addEventListener("click", () => chip.classList.toggle("selected"));
+        });
+
+        // Save
+        document.getElementById("btn-save-subs").addEventListener("click", async () => {
+            const selected = [...document.querySelectorAll("#topic-toggles .acct-topic-chip.selected")]
+                .map(c => c.dataset.topic);
+            const btn = document.getElementById("btn-save-subs");
+            const status = document.getElementById("subs-status");
+            btn.disabled = true;
+            try {
+                const res = await fetch(`${API}/users/subscriptions`, {
+                    method: "PUT",
+                    headers: { "x-api-key": key, "Content-Type": "application/json" },
+                    body: JSON.stringify({ topics: selected })
+                });
+                const data = await res.json();
+                status.className = "acct-status success";
+                status.textContent = selected.length
+                    ? `Subscribed to ${selected.join(", ")}`
+                    : "Cleared — showing all topics";
+                cachedTopics = null;
+                setTimeout(() => { closePanel(); route(); }, 1200);
+            } catch (e) {
+                status.className = "acct-status error";
+                status.textContent = e.message;
+            }
+            btn.disabled = false;
+        });
+
+        // Logout
+        document.getElementById("btn-logout").addEventListener("click", () => {
+            clearApiKey();
+            cachedTopics = null;
+            closePanel();
+            route();
         });
     }
 

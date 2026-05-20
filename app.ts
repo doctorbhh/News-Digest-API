@@ -80,5 +80,8 @@ const currentFile = fileURLToPath(import.meta.url);
 const isMain = process.argv[1] && resolve(currentFile) === resolve(process.argv[1]);
 
 if (isMain) {
-    startServer();
+    startServer().catch((err) => {
+        console.error("Server startup failed:", err);
+        process.exit(1);
+    });
 }

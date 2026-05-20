@@ -641,3 +641,162 @@ img { max-width:100%; }
     .topbar-search { max-width: none; flex: 1; }
     .topbar-actions { gap: var(--space-2); }
 }
+
+/* ── Account Panel (slide-out) ────────────────────────── */
+.account-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 90;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+.account-overlay.open {
+    opacity: 1; pointer-events: auto;
+}
+
+.account-panel {
+    position: fixed; top: 0; right: 0;
+    width: 380px; max-width: 90vw; height: 100vh;
+    background: var(--bg-card);
+    border-left: 1px solid var(--border);
+    z-index: 100;
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    box-shadow: -4px 0 24px rgba(0,0,0,0.08);
+}
+.account-panel.open {
+    transform: translateX(0);
+}
+
+.account-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--border);
+}
+.account-panel-header h3 {
+    font-family: var(--font-heading);
+    font-size: 22px; font-weight: 700;
+    color: var(--text-heading);
+}
+
+#account-panel-body {
+    flex: 1; overflow-y: auto;
+    padding: var(--space-3);
+}
+
+/* Section blocks inside panel */
+.acct-section {
+    margin-bottom: var(--space-4);
+}
+.acct-section-title {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: var(--space-1);
+}
+.acct-key-display {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-family: monospace; font-size: 13px;
+    color: var(--text-primary);
+    word-break: break-all;
+}
+.acct-key-display button {
+    flex-shrink: 0;
+    background: none; border: none; cursor: pointer;
+    color: var(--accent); padding: 4px;
+    display: flex; align-items: center;
+}
+
+.acct-info {
+    font-size: 14px; line-height: 1.6;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-2);
+}
+
+/* Topic toggle chips */
+.acct-topic-grid {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-bottom: var(--space-2);
+}
+.acct-topic-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border);
+    font-size: 13px; font-weight: 500;
+    color: var(--text-secondary);
+    background: transparent;
+    cursor: pointer;
+    transition: all var(--transition);
+    user-select: none;
+}
+.acct-topic-chip:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.acct-topic-chip.selected {
+    background: var(--accent);
+    color: var(--accent-on);
+    border-color: var(--accent);
+}
+.acct-topic-chip .material-symbols-outlined {
+    font-size: 16px;
+}
+
+/* Buttons inside panel */
+.acct-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 20px;
+    background: var(--accent); color: var(--accent-on);
+    border: none; border-radius: var(--radius-full);
+    font-family: var(--font-body); font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all var(--transition);
+    width: 100%;
+}
+.acct-btn:hover { filter: brightness(1.1); }
+.acct-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.acct-btn--outline {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+}
+.acct-btn--outline:hover {
+    background: var(--accent-dim);
+}
+
+.acct-btn--danger {
+    background: transparent;
+    color: var(--error);
+    border: 1px solid var(--error);
+}
+.acct-btn--danger:hover {
+    background: var(--error-container);
+}
+
+.acct-status {
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    font-size: 13px; font-weight: 500;
+    margin-top: var(--space-2);
+    text-align: center;
+}
+.acct-status.success {
+    background: var(--sentiment-positive-bg);
+    color: var(--sentiment-positive);
+}
+.acct-status.error {
+    background: var(--sentiment-negative-bg);
+    color: var(--sentiment-negative);
+}
+
+.acct-divider {
+    height: 1px;
+    background: var(--border);
+    margin: var(--space-3) 0;
+}
