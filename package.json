@@ -17,9 +17,12 @@
   "main": "dist/app.js",
   "scripts": {
     "dev": "tsx app.ts",
-    "build": "tsc && xcopy /E /I /Y public dist\\public",
+    "build": "tsc && node -e \"const fs=require('fs');fs.cpSync('public','dist/public',{recursive:true})\"",
     "start": "node dist/app.js",
     "test:api": "tsx tests/api.endpoints.test.ts"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "keywords": [],
   "author": "News Digest Team",

@@ -239,6 +239,9 @@ Keywords are extracted using term-frequency scoring:
 │   ├── api-frontend-guide.md   # Frontend integration guide
 │   └── NewsDigest.postman_collection.json
 ├── .env.example                # Environment variable template
+├── render.yaml                 # Render deployment blueprint
+├── Dockerfile                  # Multi-stage production container
+├── .dockerignore               # Docker build context exclusions
 ├── package.json
 └── tsconfig.json
 ```
@@ -249,6 +252,75 @@ Keywords are extracted using term-frequency scoring:
 npm run test:api
 ```
 
+## 🚢 Deployment
+
+### Deploy to Render (recommended — free tier)
+
+1. **Push your code to GitHub** (if not already):
+   ```bash
+   git add -A
+   git commit -m "Prepare for deployment"
+   git push origin main
+   ```
+
+2. **Go to [render.com](https://render.com)** → New → **Web Service**
+
+3. **Connect your GitHub repository** and select the branch.
+
+4. Render will auto-detect the [`render.yaml`](render.yaml) blueprint. Alternatively, configure manually:
+   | Setting | Value |
+   |---|---|
+   | **Build Command** | `npm install && npm run build` |
+   | **Start Command** | `npm start` |
+   | **Environment** | Node |
+
+5. **Set environment variables** in the Render dashboard:
+   | Variable | Value |
+   |---|---|
+   | `MONGO_URI` | Your MongoDB Atlas connection string |
+   | `GEMINI_API_KEY` | Your Google Gemini API key |
+   | `NODE_ENV` | `production` |
+
+6. Click **Deploy** — your app will be live at `https://newsdigest-api.onrender.com`.
+
+> **Note:** Render free tier spins down after 15 min of inactivity. First request after spin-down takes ~30s to cold-start.
+
+---
+
+### Deploy to Railway
+
+1. **Push your code to GitHub.**
+
+2. **Go to [railway.app](https://railway.app)** → New Project → **Deploy from GitHub Repo**
+
+3. Railway auto-detects the `Dockerfile` and builds it. If you prefer Nixpacks (no Docker), Railway also detects `package.json` and runs `npm run build` + `npm start` automatically.
+
+4. **Set environment variables** in Railway's dashboard:
+   | Variable | Value |
+   |---|---|
+   | `MONGO_URI` | Your MongoDB Atlas connection string |
+   | `GEMINI_API_KEY` | Your Google Gemini API key |
+   | `PORT` | `3000` |
+
+5. Railway assigns a public URL automatically. Done!
+
+---
+
+### Docker (any host)
+
+```bash
+# Build
+docker build -t newsdigest .
+
+# Run
+docker run -p 3000:3000 \
+  -e MONGO_URI="mongodb+srv://..." \
+  -e GEMINI_API_KEY="your_key" \
+  newsdigest
+```
+
 ## 📄 License
 
-ISC
+This project is licensed under the **ISC License** — a permissive open-source license that allows free use, modification, and distribution with minimal restrictions.
+
+See the [LICENSE](LICENSE) file for the full text.

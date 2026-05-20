@@ -1,0 +1,24 @@
+# ── Render Blueprint ──────────────────────────────────────
+# Deploy: Push to GitHub → connect repo on https://render.com
+# Render reads this file and auto-configures the service.
+
+services:
+  - type: web
+    name: newsdigest-api
+    runtime: node
+    plan: free                  # free tier (spins down after inactivity)
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: MONGO_URI
+        sync: false             # set manually in Render dashboard
+      - key: GEMINI_API_KEY
+        sync: false             # set manually in Render dashboard
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash-lite
+      - key: CRON_SCHEDULE
+        value: "*/15 * * * *"
