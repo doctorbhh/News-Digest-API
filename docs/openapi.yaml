@@ -1,21 +1,126 @@
 openapi: 3.1.0
 info:
   title: News Digest API
-  version: 1.0.0
+  version: 1.1.0
   description: |
-    OpenAPI specification for the News Digest frontend API.
-    Use clusters as the main digest feed and articles for detail views.
+    Multi-source news aggregator with AI summarization, article clustering,
+    sentiment analysis, and personalized topic subscriptions.
+
+    ## Authentication
+    Most read endpoints work without authentication. To enable personalized
+    digests, register via `POST /users/register` to obtain an API key, then
+    send it in the `x-api-key` header.
+
+    ## Rate Limiting
+    All `/api/v1` endpoints are rate-limited to **100 requests per 15 minutes**
+    per IP. Responses include standard `RateLimit-*` headers.
+
 servers:
-  - url: http://localhost:4000/api/v1
+  - url: http://localhost:3000/api/v1
     description: Local development server
+
 tags:
+  - name: Users
+    description: Registration, authentication, and topic subscriptions
   - name: Articles
     description: Raw article endpoints
   - name: Clusters
-    description: Grouped story endpoints
+    description: Grouped story endpoints (digest)
   - name: Topics
     description: Topic discovery and topic-based cluster feeds
+
+security:
+  - ApiKeyAuth: []
+  - {}
+
 paths:
+  # ── Users ──────────────────────────────────────────────
+  /users/register:
+    post:
+      tags: [Users]
+      summary: Register a new user
+      description: Creates a new user and returns a unique API key. The key cannot be recovered — save it securely.
+      security: []
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '500':
+          description: Registration failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Get current user profile
+      description: Returns the authenticated user's subscribed topics and account creation date.
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '401':
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /users/subscriptions:
+    put:
+      tags: [Users]
+      summary: Update topic subscriptions
+      description: |
+        Replaces the user's subscribed topics with the provided array.
+        When subscribed, `GET /clusters` (and alias `/digest`) will automatically
+        filter results to only the user's chosen topics.
+        Send an empty array to clear subscriptions and see all topics.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [topics]
+              properties:
+                topics:
+                  type: array
+                  items:
+                    type: string
+                  example: ["politics", "technology", "sports"]
+      responses:
+        '200':
+          description: Subscriptions updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResponse'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  # ── Articles ───────────────────────────────────────────
   /articles:
     get:
       tags: [Articles]
@@ -24,37 +129,24 @@ paths:
       parameters:
         - in: query
           name: page
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
+          schema: { type: integer, minimum: 1, default: 1 }
         - in: query
           name: limit
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 10
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
         - in: query
           name: topic
-          schema:
-            type: string
-          example: ai
+          schema: { type: string }
+          example: politics
         - in: query
           name: source
-          schema:
-            type: string
+          schema: { type: string }
           example: bbc
         - in: query
           name: sentiment
-          schema:
-            type: string
-            enum: [positive, neutral, negative]
-          example: positive
+          schema: { type: string, enum: [positive, neutral, negative] }
         - in: query
           name: sort
-          schema:
-            type: string
+          schema: { type: string }
           example: -publishedAt
       responses:
         '200':
@@ -63,17 +155,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedArticlesResponse'
-    
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
   /articles/{id}:
     get:
       tags: [Articles]
-      summary: Get article by id
+      summary: Get article by ID
       parameters:
         - in: path
           name: id
           required: true
-          schema:
-            type: string
+          schema: { type: string }
       responses:
         '200':
           description: Article found
@@ -82,40 +175,41 @@ paths:
               schema:
                 $ref: '#/components/schemas/ArticleResponse'
         '400':
-          description: Invalid article id
+          description: Invalid article ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
         '404':
           description: Article not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 
+  # ── Clusters / Digest ──────────────────────────────────
   /clusters:
     get:
       tags: [Clusters]
       summary: List clustered stories
-      description: Main digest endpoint. Returns grouped stories for the frontend home feed.
+      description: |
+        Main digest endpoint. Returns grouped stories for the frontend home feed.
+        If authenticated with subscribed topics, results are filtered to those topics.
+        Alias: `/digest` returns the same response.
       parameters:
         - in: query
           name: page
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
+          schema: { type: integer, minimum: 1, default: 1 }
         - in: query
           name: limit
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 10
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
         - in: query
           name: topic
-          schema:
-            type: string
+          schema: { type: string }
           example: technology
         - in: query
           name: sentiment
-          schema:
-            type: string
-            enum: [positive, neutral, negative]
-          example: negative
+          schema: { type: string, enum: [positive, neutral, negative] }
       responses:
         '200':
           description: Paginated cluster list
@@ -123,18 +217,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedClustersResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /clusters/{id}:
     get:
       tags: [Clusters]
-      summary: Get cluster by id
-      description: Returns the cluster metadata plus all related articles.
+      summary: Get cluster by ID
+      description: Returns the cluster metadata plus all related articles. Alias `/digest/{id}`.
       parameters:
         - in: path
           name: id
           required: true
-          schema:
-            type: string
+          schema: { type: string }
       responses:
         '200':
           description: Cluster and related articles
@@ -143,15 +238,69 @@ paths:
               schema:
                 $ref: '#/components/schemas/ClusterDetailResponse'
         '400':
-          description: Invalid cluster id
+          description: Invalid cluster ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
         '404':
           description: Cluster not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
 
+  # ── Digest aliases (document only) ─────────────────────
+  /digest:
+    get:
+      tags: [Clusters]
+      summary: List clustered stories (alias)
+      description: Alias for `GET /clusters`. Same parameters and response.
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+        - in: query
+          name: topic
+          schema: { type: string }
+        - in: query
+          name: sentiment
+          schema: { type: string, enum: [positive, neutral, negative] }
+      responses:
+        '200':
+          description: Paginated cluster list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedClustersResponse'
+
+  /digest/{id}:
+    get:
+      tags: [Clusters]
+      summary: Get cluster by ID (alias)
+      description: Alias for `GET /clusters/{id}`. Same response.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Cluster and related articles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterDetailResponse'
+
+  # ── Topics ─────────────────────────────────────────────
   /topics:
     get:
       tags: [Topics]
       summary: List available topics
-      description: Returns the set of topic labels currently available in the cluster collection.
+      description: Returns a sorted array of topic label strings from the cluster collection.
       responses:
         '200':
           description: Array of topic strings
@@ -161,32 +310,52 @@ paths:
                 type: array
                 items:
                   type: string
+                example: ["business", "crime", "general", "politics", "sports", "technology"]
 
   /topics/{topic}/clusters:
     get:
       tags: [Topics]
       summary: List clusters for a topic
-      description: Returns clustered stories for a topic slug such as artificial-intelligence.
+      description: Returns clustered stories filtered by topic slug. Alias `/topic/{name}`.
       parameters:
         - in: path
           name: topic
           required: true
-          schema:
-            type: string
-          example: artificial-intelligence
+          schema: { type: string }
+          example: politics
         - in: query
           name: page
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
+          schema: { type: integer, minimum: 1, default: 1 }
         - in: query
           name: limit
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 10
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200':
+          description: Paginated cluster list for a topic
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicClustersResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /topic/{name}:
+    get:
+      tags: [Topics]
+      summary: List clusters for a topic (alias)
+      description: Alias for `GET /topics/{topic}/clusters`. Same response.
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema: { type: string }
+          example: politics
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
       responses:
         '200':
           description: Paginated cluster list for a topic
@@ -196,14 +365,83 @@ paths:
                 $ref: '#/components/schemas/TopicClustersResponse'
 
 components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: API key obtained from `POST /users/register`.
+
+  responses:
+    RateLimited:
+      description: Rate limit exceeded (100 req / 15 min per IP)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            success: false
+            message: "Too many requests, please try again later."
+
   schemas:
     ApiError:
       type: object
       properties:
         success:
           type: boolean
+          example: false
         message:
           type: string
+        error:
+          type: string
+          description: Technical error detail (only in 500 responses)
+
+    RegisterResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "User registered. Save your API key — it cannot be recovered."
+        apiKey:
+          type: string
+          format: uuid
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+    UserProfileResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            subscribedTopics:
+              type: array
+              items:
+                type: string
+              example: ["politics", "technology"]
+            createdAt:
+              type: string
+              format: date-time
+
+    SubscriptionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Subscriptions updated"
+        subscribedTopics:
+          type: array
+          items:
+            type: string
+          example: ["politics", "technology", "sports"]
 
     Article:
       type: object
@@ -297,16 +535,11 @@ components:
     PaginatedArticlesResponse:
       type: object
       properties:
-        success:
-          type: boolean
-        page:
-          type: integer
-        limit:
-          type: integer
-        total:
-          type: integer
-        totalPages:
-          type: integer
+        success: { type: boolean }
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
         data:
           type: array
           items:
@@ -315,16 +548,11 @@ components:
     PaginatedClustersResponse:
       type: object
       properties:
-        success:
-          type: boolean
-        page:
-          type: integer
-        limit:
-          type: integer
-        total:
-          type: integer
-        totalPages:
-          type: integer
+        success: { type: boolean }
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
         data:
           type: array
           items:
@@ -333,18 +561,12 @@ components:
     TopicClustersResponse:
       type: object
       properties:
-        success:
-          type: boolean
-        topic:
-          type: string
-        page:
-          type: integer
-        limit:
-          type: integer
-        total:
-          type: integer
-        totalPages:
-          type: integer
+        success: { type: boolean }
+        topic: { type: string }
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
         data:
           type: array
           items:
@@ -353,16 +575,14 @@ components:
     ArticleResponse:
       type: object
       properties:
-        success:
-          type: boolean
+        success: { type: boolean }
         data:
           $ref: '#/components/schemas/Article'
 
     ClusterDetailResponse:
       type: object
       properties:
-        success:
-          type: boolean
+        success: { type: boolean }
         data:
           type: object
           properties:

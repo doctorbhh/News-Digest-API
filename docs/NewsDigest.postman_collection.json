@@ -1,16 +1,115 @@
 {
     "info": {
         "name": "News Digest API",
-        "description": "Complete API collection for the News Digest multi-source news aggregator.",
+        "description": "Complete API collection for the News Digest multi-source news aggregator.\n\n## Authentication\nMost endpoints support optional API key authentication via the `x-api-key` header.\nProtected endpoints (`/users/me`, `/users/subscriptions`) require it.\n\nTo register: `POST /users/register` → save the returned `apiKey` in the `apiKey` collection variable.\n\n## Rate Limiting\n100 requests per 15 minutes per IP. Responses include `RateLimit-*` headers.",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "variable": [
         {
             "key": "baseUrl",
             "value": "http://localhost:3000/api/v1"
+        },
+        {
+            "key": "apiKey",
+            "value": "",
+            "description": "Your API key from POST /users/register. Set after registering."
         }
     ],
     "item": [
+        {
+            "name": "Users",
+            "description": "User registration, profile, and topic subscriptions.",
+            "item": [
+                {
+                    "name": "Register User",
+                    "request": {
+                        "method": "POST",
+                        "url": {
+                            "raw": "{{baseUrl}}/users/register",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["users", "register"]
+                        },
+                        "description": "Creates a new user and returns a unique API key. Save this key — it cannot be recovered."
+                    },
+                    "response": [
+                        {
+                            "name": "201 — Registered",
+                            "status": "Created",
+                            "code": 201,
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"User registered. Save your API key — it cannot be recovered.\",\n  \"apiKey\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Get My Profile",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{baseUrl}}/users/me",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["users", "me"]
+                        },
+                        "header": [
+                            { "key": "x-api-key", "value": "{{apiKey}}", "description": "Required. Your API key." }
+                        ],
+                        "description": "Returns the authenticated user's profile and subscribed topics. Requires `x-api-key` header."
+                    },
+                    "response": [
+                        {
+                            "name": "200 — Profile",
+                            "status": "OK",
+                            "code": 200,
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": true,\n  \"data\": {\n    \"subscribedTopics\": [\"politics\", \"technology\"],\n    \"createdAt\": \"2026-05-19T12:00:00.000Z\"\n  }\n}"
+                        },
+                        {
+                            "name": "401 — Missing key",
+                            "status": "Unauthorized",
+                            "code": 401,
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": false,\n  \"message\": \"Missing x-api-key header\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Update Subscriptions",
+                    "request": {
+                        "method": "PUT",
+                        "url": {
+                            "raw": "{{baseUrl}}/users/subscriptions",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["users", "subscriptions"]
+                        },
+                        "header": [
+                            { "key": "x-api-key", "value": "{{apiKey}}", "description": "Required. Your API key." },
+                            { "key": "Content-Type", "value": "application/json" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"topics\": [\"politics\", \"technology\", \"sports\"]\n}"
+                        },
+                        "description": "Replaces the user's subscribed topics. When subscribed, GET /digest will return only clusters matching these topics. Send an empty array to clear."
+                    },
+                    "response": [
+                        {
+                            "name": "200 — Updated",
+                            "status": "OK",
+                            "code": 200,
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": true,\n  \"message\": \"Subscriptions updated\",\n  \"subscribedTopics\": [\"politics\", \"technology\", \"sports\"]\n}"
+                        },
+                        {
+                            "name": "400 — Invalid body",
+                            "status": "Bad Request",
+                            "code": 400,
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": false,\n  \"message\": \"\\\"topics\\\" must be an array of strings\"\n}"
+                        }
+                    ]
+                }
+            ]
+        },
         {
             "name": "Articles",
             "item": [
@@ -25,14 +124,26 @@
                             "query": [
                                 { "key": "page", "value": "1" },
                                 { "key": "limit", "value": "10" },
-                                { "key": "topic", "value": "general", "disabled": true },
+                                { "key": "topic", "value": "politics", "disabled": true },
                                 { "key": "source", "value": "India Today", "disabled": true },
                                 { "key": "sentiment", "value": "positive", "disabled": true },
                                 { "key": "sort", "value": "-publishedAt", "disabled": true }
                             ]
                         },
+                        "header": [
+                            { "key": "x-api-key", "value": "{{apiKey}}", "description": "Optional. Sends personalized results if set.", "disabled": true }
+                        ],
                         "description": "Returns paginated articles with optional filters for topic, source, sentiment, and sort order."
-                    }
+                    },
+                    "response": [
+                        {
+                            "name": "200 — Paginated articles",
+                            "status": "OK",
+                            "code": 200,
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": true,\n  \"page\": 1,\n  \"limit\": 10,\n  \"total\": 42,\n  \"totalPages\": 5,\n  \"data\": [\n    {\n      \"_id\": \"664abc123def456789012345\",\n      \"title\": \"Example Article Title\",\n      \"summary\": \"AI-generated summary of the article.\",\n      \"source\": { \"name\": \"The Hindu\", \"type\": \"rss\" },\n      \"topic\": \"politics\",\n      \"sentiment\": \"neutral\",\n      \"keywords\": [\"election\", \"policy\"],\n      \"publishedAt\": \"2026-05-19T10:00:00.000Z\"\n    }\n  ]\n}"
+                        }
+                    ]
                 },
                 {
                     "name": "Get Article by ID",
@@ -47,12 +158,29 @@
                             ]
                         },
                         "description": "Returns a single article by its MongoDB ObjectId."
-                    }
+                    },
+                    "response": [
+                        {
+                            "name": "200 — Article found",
+                            "status": "OK",
+                            "code": 200,
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": true,\n  \"data\": {\n    \"_id\": \"664abc123def456789012345\",\n    \"title\": \"Example Article\",\n    \"summary\": \"AI summary text.\",\n    \"source\": { \"name\": \"NDTV\" },\n    \"sentiment\": \"positive\",\n    \"publishedAt\": \"2026-05-19T10:00:00.000Z\"\n  }\n}"
+                        },
+                        {
+                            "name": "404 — Not found",
+                            "status": "Not Found",
+                            "code": 404,
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": false,\n  \"message\": \"Article not found\"\n}"
+                        }
+                    ]
                 }
             ]
         },
         {
-            "name": "Digest",
+            "name": "Digest / Clusters",
+            "description": "Main digest feed. `/digest` and `/clusters` are interchangeable aliases.",
             "item": [
                 {
                     "name": "GET /digest — All Clustered News",
@@ -65,27 +193,55 @@
                             "query": [
                                 { "key": "page", "value": "1" },
                                 { "key": "limit", "value": "10" },
-                                { "key": "topic", "value": "general", "disabled": true },
+                                { "key": "topic", "value": "politics", "disabled": true },
                                 { "key": "sentiment", "value": "positive", "disabled": true }
                             ]
                         },
-                        "description": "Main digest endpoint. Returns all grouped stories for the frontend home feed. Alias: /clusters also works."
-                    }
+                        "header": [
+                            { "key": "x-api-key", "value": "{{apiKey}}", "description": "Optional. When set with subscribed topics, filters digest to only subscribed topics.", "disabled": true }
+                        ],
+                        "description": "Main digest endpoint. Returns grouped stories for the frontend home feed.\n\n**Personalization:** If a valid `x-api-key` is provided and the user has subscribed topics, only clusters matching those topics are returned.\n\nAlias: `/clusters` also works."
+                    },
+                    "response": [
+                        {
+                            "name": "200 — Paginated clusters",
+                            "status": "OK",
+                            "code": 200,
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": true,\n  \"page\": 1,\n  \"limit\": 10,\n  \"total\": 25,\n  \"totalPages\": 3,\n  \"data\": [\n    {\n      \"_id\": \"664clu123def456789012345\",\n      \"headline\": \"Urban reforms push for greener cities\",\n      \"summary\": \"AI executive summary of the cluster.\",\n      \"topic\": \"politics\",\n      \"articleCount\": 3,\n      \"sources\": [\"The Hindu\", \"NDTV\"],\n      \"sentimentDistribution\": { \"positive\": 1, \"neutral\": 2, \"negative\": 0 },\n      \"lastArticlePublishedAt\": \"2026-05-19T10:30:00.000Z\"\n    }\n  ]\n}"
+                        },
+                        {
+                            "name": "429 — Rate limited",
+                            "status": "Too Many Requests",
+                            "code": 429,
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": false,\n  \"message\": \"Too many requests, please try again later.\"\n}"
+                        }
+                    ]
                 },
                 {
-                    "name": "GET /digest/:id — Cluster Detail",
+                    "name": "GET /clusters/:id — Cluster Detail",
                     "request": {
                         "method": "GET",
                         "url": {
-                            "raw": "{{baseUrl}}/digest/:id",
+                            "raw": "{{baseUrl}}/clusters/:id",
                             "host": ["{{baseUrl}}"],
-                            "path": ["digest", ":id"],
+                            "path": ["clusters", ":id"],
                             "variable": [
                                 { "key": "id", "value": "REPLACE_WITH_CLUSTER_ID" }
                             ]
                         },
-                        "description": "Returns cluster metadata plus all related articles. Alias: /clusters/:id also works."
-                    }
+                        "description": "Returns cluster metadata plus all related articles. Alias: `/digest/:id` also works."
+                    },
+                    "response": [
+                        {
+                            "name": "200 — Cluster detail",
+                            "status": "OK",
+                            "code": 200,
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": true,\n  \"data\": {\n    \"cluster\": {\n      \"_id\": \"664clu123def456789012345\",\n      \"headline\": \"Urban reforms push for greener cities\",\n      \"summary\": \"Full cluster summary.\",\n      \"topic\": \"politics\",\n      \"articleCount\": 3,\n      \"sources\": [\"The Hindu\"]\n    },\n    \"articles\": [\n      {\n        \"_id\": \"664abc123def456789012345\",\n        \"title\": \"Related article title\",\n        \"sentiment\": \"neutral\"\n      }\n    ]\n  }\n}"
+                        }
+                    ]
                 }
             ]
         },
@@ -101,11 +257,48 @@
                             "host": ["{{baseUrl}}"],
                             "path": ["topics"]
                         },
-                        "description": "Returns an array of available topic strings."
-                    }
+                        "description": "Returns a sorted array of available topic strings."
+                    },
+                    "response": [
+                        {
+                            "name": "200 — Topic list",
+                            "status": "OK",
+                            "code": 200,
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "[\"business\", \"crime\", \"general\", \"politics\", \"sports\", \"technology\"]"
+                        }
+                    ]
                 },
                 {
-                    "name": "GET /topic/:name — Clusters by Topic",
+                    "name": "GET /topics/:topic/clusters — Clusters by Topic",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{baseUrl}}/topics/:topic/clusters?page=1&limit=10",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["topics", ":topic", "clusters"],
+                            "variable": [
+                                { "key": "topic", "value": "politics" }
+                            ],
+                            "query": [
+                                { "key": "page", "value": "1" },
+                                { "key": "limit", "value": "10" }
+                            ]
+                        },
+                        "description": "Returns clusters for a specific topic. Alias: `/topic/:name` also works."
+                    },
+                    "response": [
+                        {
+                            "name": "200 — Topic clusters",
+                            "status": "OK",
+                            "code": 200,
+                            "header": [{ "key": "Content-Type", "value": "application/json" }],
+                            "body": "{\n  \"success\": true,\n  \"topic\": \"politics\",\n  \"page\": 1,\n  \"limit\": 10,\n  \"total\": 8,\n  \"totalPages\": 1,\n  \"data\": []\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "GET /topic/:name — Alias",
                     "request": {
                         "method": "GET",
                         "url": {
@@ -113,14 +306,14 @@
                             "host": ["{{baseUrl}}"],
                             "path": ["topic", ":name"],
                             "variable": [
-                                { "key": "name", "value": "general" }
+                                { "key": "name", "value": "politics" }
                             ],
                             "query": [
                                 { "key": "page", "value": "1" },
                                 { "key": "limit", "value": "10" }
                             ]
                         },
-                        "description": "Returns clusters for a specific topic. Alias: /topics/:topic/clusters also works."
+                        "description": "Alias for `/topics/:topic/clusters`. Both return the same response."
                     }
                 }
             ]

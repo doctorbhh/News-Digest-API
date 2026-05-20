@@ -255,7 +255,7 @@
 
         if (featured) {
             return `
-            <article class="card card--ai fade-in" data-cluster-id="${esc(cluster._id)}">
+            <article class="card card--ai fade-in" data-cluster-id="${esc(cluster._id)}" data-article-count="${count}" data-first-article-id="${esc((cluster.articleIds || [])[0] || '')}">
                 <div class="card-ai-label">
                     <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">auto_awesome</span>
                     <span>AI Executive Summary</span>
@@ -277,7 +277,7 @@
         }
 
         return `
-        <article class="card fade-in" data-cluster-id="${esc(cluster._id)}">
+        <article class="card fade-in" data-cluster-id="${esc(cluster._id)}" data-article-count="${count}" data-first-article-id="${esc((cluster.articleIds || [])[0] || '')}">
             <h3 class="card-headline">${esc(cluster.headline)}</h3>
             <p class="card-summary">${esc(cluster.summary)}</p>
             <div class="card-footer">
@@ -504,7 +504,14 @@
     function bindClusterCards() {
         document.querySelectorAll(".card[data-cluster-id]").forEach(card => {
             card.addEventListener("click", () => {
-                window.location.hash = `#cluster/${card.dataset.clusterId}`;
+                const count = parseInt(card.dataset.articleCount || "0", 10);
+                const firstId = card.dataset.firstArticleId;
+                if (count === 1 && firstId) {
+                    // Skip Story view for single-article clusters
+                    window.location.hash = `#article/${firstId}`;
+                } else {
+                    window.location.hash = `#cluster/${card.dataset.clusterId}`;
+                }
             });
         });
     }

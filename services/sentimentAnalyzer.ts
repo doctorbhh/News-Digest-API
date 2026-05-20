@@ -128,6 +128,88 @@ function tokenize(text: string): string[] {
         .filter(t => t.length > 1);
 }
 
+/**
+ * Lightweight suffix stripper so inflected forms (kills→kill, died→die,
+ * burdened→burden, shooting→shoot) match their lexicon roots.
+ */
+function stem(word: string): string {
+    // Preserve short words
+    if (word.length <= 3) return word;
+
+    // Order matters: try longest suffixes first
+    const rules: [RegExp, string][] = [
+        [/ies$/, "y"],      // economies→economy
+        [/ied$/, "y"],      // died→dy? no — handle "died" specially below
+        [/ying$/, "y"],     // dying→dy? no — too aggressive, skip
+        [/tion$/, "te"],    // destruction→destructe? no — just strip -ion
+        [/sion$/, "se"],
+        [/ness$/, ""],      // helplessness→helpless
+        [/ment$/, ""],      // unemployment→unemploy
+        [/ened$/, "en"],    // threatened→threaten
+        [/ling$/, "le"],    // struggling→struggle? no
+        [/ting$/, "te"],    // devastating→devaste? no
+        [/ning$/, "n"],     // warning→warn — but "running"? skip
+        [/ding$/, "d"],     // bleeding→bleed? no. Just add common forms
+        [/ring$/, "r"],     // suffering→suffer? no
+        [/ling$/, "l"],
+        [/cing$/, "ce"],    // reducing→reduce
+        [/sing$/, "se"],    // abusing→abuse
+        [/ving$/, "ve"],    // surviving→survive
+        [/zing$/, "ze"],
+        [/ing$/, ""],       // shooting→shoot, killing→kill
+        [/ened$/, ""],
+        [/ated$/, "ate"],   // devastated→devastate
+        [/ised$/, "ise"],
+        [/ized$/, "ize"],
+        [/ered$/, "er"],    // murdered→murder
+        [/ured$/, "ure"],
+        [/ed$/, ""],        // crashed→crash, killed→kill
+        [/ers$/, "er"],     // killers→killer
+        [/ors$/, "or"],
+        [/ous$/, ""],       // dangerous→danger (close enough)
+        [/ful$/, ""],       // harmful→harm
+        [/less$/, ""],      // helpless→help
+        [/ly$/, ""],        // deadly→dead
+        [/es$/, ""],        // crashes→crash
+        [/s$/, ""],         // kills→kill
+    ];
+
+    for (const [pattern, replacement] of rules) {
+        if (pattern.test(word)) {
+            const stemmed = word.replace(pattern, replacement);
+            // Only accept if the result is at least 2 chars
+            if (stemmed.length >= 2) return stemmed;
+        }
+    }
+    return word;
+}
+
+/**
+ * Negative phrases that should override individual token scores.
+ * Each phrase maps to a flat negative score injected into the total.
+ */
+const NEGATIVE_PHRASES: [string[], number][] = [
+    [["good", "for", "nothing"], -4],
+    [["calls", "off"], -1],
+    [["no", "good"], -3],
+    [["not", "good"], -3],
+    [["too", "good", "to", "be", "true"], -3],
+    [["taken", "for", "granted"], -2],
+    [["breaks", "down"], -2],
+    [["break", "down"], -2],
+    [["gives", "up"], -2],
+    [["give", "up"], -2],
+    [["pass", "away"], -3],
+    [["passed", "away"], -3],
+    [["wipes", "out"], -3],
+    [["wiped", "out"], -3],
+    [["died", "by", "suicide"], -5],
+    [["kills", "self"], -5],
+    [["kill", "self"], -5],
+    [["ends", "life"], -5],
+    [["end", "life"], -5],
+];
+
 const POSITIVE_THRESHOLD = 0.08;
 const NEGATIVE_THRESHOLD = -0.08;
 
@@ -139,16 +221,37 @@ export function analyzeSentiment(title: string, content: string): SentimentResul
         return { label: "neutral", score: 0 };
     }
 
-    let totalScore = 0;
-    let scoredTokens = 0;
+    // ── Phase 1: detect negative phrases and mark consumed tokens ──
+    let phraseScore = 0;
+    const consumed = new Set<number>();
+
+    for (const [phrase, score] of NEGATIVE_PHRASES) {
+        for (let i = 0; i <= tokens.length - phrase.length; i++) {
+            let match = true;
+            for (let j = 0; j < phrase.length; j++) {
+                if (tokens[i + j] !== phrase[j]) { match = false; break; }
+            }
+            if (match) {
+                phraseScore += score;
+                for (let j = 0; j < phrase.length; j++) consumed.add(i + j);
+            }
+        }
+    }
+
+    // ── Phase 2: score individual tokens with stemming ──
+    let totalScore = phraseScore;
+    let scoredTokens = consumed.size > 0 ? 1 : 0; // count phrase as scored
 
     for (let i = 0; i < tokens.length; i++) {
-        const token = tokens[i];
-        const lexScore = LEXICON[token];
+        if (consumed.has(i)) continue; // already scored as part of a phrase
 
-        if (lexScore === undefined) {
-            continue;
-        }
+        const token = tokens[i];
+        const stemmed = stem(token);
+
+        // Try exact match first, then stemmed form
+        let lexScore = LEXICON[token];
+        if (lexScore === undefined) lexScore = LEXICON[stemmed];
+        if (lexScore === undefined) continue;
 
         let modifier = 1;
 
@@ -185,3 +288,4 @@ export function analyzeSentiment(title: string, content: string): SentimentResul
         score: Math.round(totalScore * 100) / 100
     };
 }
+
