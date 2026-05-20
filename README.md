@@ -270,7 +270,7 @@ npm run test:api
 4. Render will auto-detect the [`render.yaml`](render.yaml) blueprint. Alternatively, configure manually:
    | Setting | Value |
    |---|---|
-   | **Build Command** | `npm install && npm run build` |
+   | **Build Command** | `npm install --include=dev && npm run build` |
    | **Start Command** | `npm start` |
    | **Environment** | Node |
 

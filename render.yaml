@@ -7,7 +7,7 @@ services:
     name: newsdigest-api
     runtime: node
     plan: free                  # free tier (spins down after inactivity)
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
