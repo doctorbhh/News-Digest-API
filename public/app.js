@@ -74,9 +74,9 @@
     }
 
     function sentimentIcon(label) {
-        if (label === "positive") return "▲";
-        if (label === "negative") return "▼";
-        return "●";
+        if (label === "positive") return `<span class="material-symbols-outlined sentiment-icon">trending_up</span>`;
+        if (label === "negative") return `<span class="material-symbols-outlined sentiment-icon">trending_down</span>`;
+        return `<span class="material-symbols-outlined sentiment-icon">trending_flat</span>`;
     }
 
     function esc(str) {
@@ -170,7 +170,7 @@
     function showError(message) {
         setContent(`
             <div class="error-state">
-                <div class="error-icon">⚠️</div>
+                <div class="error-icon"><span class="material-symbols-outlined" style="font-size: 48px; color: var(--error);">error</span></div>
                 <h3>Something went wrong</h3>
                 <p>${esc(message)}</p>
                 <button onclick="location.reload()">Retry</button>
@@ -181,7 +181,7 @@
     function showEmpty(msg) {
         setContent(`
             <div class="empty-state">
-                <div class="empty-icon">📭</div>
+                <div class="empty-icon"><span class="material-symbols-outlined" style="font-size: 48px; color: var(--text-muted);">inbox</span></div>
                 <h3>No stories yet</h3>
                 <p>${esc(msg || "Check back soon — the digest updates every 15 minutes.")}</p>
             </div>
@@ -339,7 +339,7 @@
             if (!data.data || data.data.length === 0) {
                 renderSidebarTopics(topics, topicSlug);
                 setContent(`<div class="empty-state">
-                    <div class="empty-icon">📭</div>
+                    <div class="empty-icon"><span class="material-symbols-outlined" style="font-size: 48px; color: var(--text-muted);">inbox</span></div>
                     <h3>No stories found</h3>
                     <p>${topicSlug ? "No stories for this topic yet." : "The digest is warming up — check back in a few minutes."}</p>
                 </div>`);
@@ -388,11 +388,11 @@
             html += `<h1 class="detail-headline">${esc(cluster.headline)}</h1>`;
             html += `<div class="detail-meta">`;
             html += `<span class="sentiment-chip ${dom}">${sentimentIcon(dom)} ${dom}</span>`;
-            html += `<span>📰 ${cluster.articleCount || articles.length} article${(cluster.articleCount || articles.length) !== 1 ? "s" : ""}</span>`;
+            html += `<span><span class="material-symbols-outlined">newspaper</span>${cluster.articleCount || articles.length} article${(cluster.articleCount || articles.length) !== 1 ? "s" : ""}</span>`;
             if (cluster.sources && cluster.sources.length) {
                 html += `<span>${cluster.sources.join(", ")}</span>`;
             }
-            html += `<span>🕒 ${timeAgo(cluster.lastArticlePublishedAt)}</span>`;
+            html += `<span><span class="material-symbols-outlined">schedule</span>${timeAgo(cluster.lastArticlePublishedAt)}</span>`;
             html += `</div>`;
 
             html += `<div class="detail-summary">${esc(cluster.summary)}</div>`;
@@ -456,8 +456,8 @@
             html += `<h1 class="detail-headline">${esc(art.title)}</h1>`;
             html += `<div class="detail-meta">`;
             html += `<span class="sentiment-chip ${art.sentiment || "neutral"}">${sentimentIcon(art.sentiment)} ${art.sentiment || "neutral"}</span>`;
-            html += `<span>📰 ${esc(art.source?.name || "Unknown")}</span>`;
-            html += `<span>🕒 ${timeAgo(art.publishedAt)}</span>`;
+            html += `<span><span class="material-symbols-outlined">newspaper</span>${esc(art.source?.name || "Unknown")}</span>`;
+            html += `<span><span class="material-symbols-outlined">schedule</span>${timeAgo(art.publishedAt)}</span>`;
             if (art.url) {
                 html += `<a href="${esc(art.url)}" target="_blank" rel="noopener" class="ext-link">Read original ↗</a>`;
             }
